@@ -36,7 +36,11 @@ export default function AuthButton() {
   };
 
   const handleLogin = () => {
-    window.google.accounts.id.prompt();
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt();
+    } else {
+      alert('Google 登录正在加载，请稍后再试');
+    }
   };
 
   const handleLogout = () => {
