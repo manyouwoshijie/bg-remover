@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     bgForm.append('image_file', imageFile);
     bgForm.append('size', 'auto');
 
-    const apiKey = process.env.REMOVE_BG_API_KEY;
+    const apiKey = process.env.REMOVE_BG_API_KEY || "ieZg6Sit1Y8U1pMfQDJWh7yG";
     if (!apiKey) {
       console.error('REMOVE_BG_API_KEY is not set');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });

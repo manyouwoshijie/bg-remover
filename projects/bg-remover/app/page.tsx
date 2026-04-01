@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
+import AuthButton from '@/components/AuthButton';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 12 * 1024 * 1024; // 12MB
@@ -105,6 +106,9 @@ export default function Home() {
       <div className="w-full max-w-3xl flex-1 flex flex-col">
         {/* Header */}
         <header className="text-center mb-10">
+          <div className="flex justify-end mb-4">
+            <AuthButton />
+          </div>
           <h1 className="text-4xl font-bold mb-3 tracking-tight">Background Remover</h1>
           <p className="text-gray-500 text-lg">上传图片，秒级去除背景，免费下载透明 PNG</p>
         </header>
