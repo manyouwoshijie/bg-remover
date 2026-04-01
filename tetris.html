@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>俄罗斯方块</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;display:flex;align-items:center;justify-content:center;height:100vh;font-family:monospace;color:#fff;gap:16px}
+#panel{display:flex;flex-direction:column;gap:8px;width:90px}
+.lbl{font-size:11px;color:#888}
+.val{font-size:20px;font-weight:bold}
+#msg{font-size:12px;color:#ff0;white-space:pre;margin-top:8px}
+#tip{font-size:11px;color:#555;line-height:1.9;margin-top:4px}
+</style>
+</head>
+<body>
+<canvas id="c" width="200" height="400" style="border:2px solid #555;background:#000"></canvas>
+<div id="panel">
+  <div class="lbl">SCORE</div><div class="val" id="sc">0</div>
+  <div class="lbl">LINES</div><div class="val" id="ln">0</div>
+  <div class="lbl">LEVEL</div><div class="val" id="lv">1</div>
+  <div class="lbl">NEXT</div>
+  <canvas id="nx" width="80" height="80" style="border:1px solid #333;background:#000"></canvas>
+  <div id="msg">Enter 开始</div>
+  <div id="tip">←→ 移动<br>↑ 旋转<br>↓ 加速<br>空格 直落<br>Enter 暂停</div>
+</div>
+<script>
+var C=document.getElementById('c'), X=C.getContext('2d');
+var N=document.getElementById('nx'), NX=N.getContext('2d');
+var SZ=20, COLS=10, ROWS=20;
+
+// 音效
+var AC=new(window.AudioContext||window.webkitAudioContext)();
+function beep(f,d,t,v){
+  if(AC.state==='suspended')return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(AC.destination);
+  o.type=t||'square';o.frequency.value=f;
+  var now=AC.currentTime;
+  g.gain.setValueAtTime(v||0.1,now);
+  g.gain.exponentialRampToValueAtTime(0.001,now+d);
+  o.start(now);o.stop(now+d);
+}
+function sfxMove(){beep(200,0.04,'square',0.06)}
+function sfxRot(){beep(400,0.06,'sine',0.08)}
+function sfxLand(){beep(150,0.08,'square',0.1)}
+function sfxDrop(){beep(100,0.1,'square',0.12)}
+function sfxClear(n){[523,659,784,1047].slice(0,n+1).forEach(function(f,i){setTimeout(function(){beep(f,0.12,'square',0.13)},i*60)})}
+function sfxDie(){beep(200,0.5,'sawtooth',0.15)}
+
+// 方块
+var SHAPES=[
+  {c:'#00e5ff',s:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]},
+  {c:'#ffee00',s:[[1,1],[1,1]]},
+  {c:'#dd00ff',s:[[0,1,0],[1,1,1],[0,0,0]]},
+  {c:'#ff8800',s:[[1,0,0],[1,1,1],[0,0,0]]},
+  {c:'#2979ff',s:[[0,0,1],[1,1,1],[0,0,0]]},
+  {c:'#00e676',s:[[0,1,1],[1,1,0],[0,0,0]]},
+  {c:'#ff1744',s:[[1,1,0],[0,1,1],[0,0,0]]}
+];
+
+function mkPiece(){
+  var p=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+  return{c:p.c,s:p.s.map(function(r){return r.slice()}),x:3,y:0};
+}
+
+function rotateCW(s){
+  var R=s.length,C=s[0].length;
+  return Array.from({length:C},function(_,c){
+    return Array.from({length:R},function(_,r){return s[R-1-r][c]});
+  });
+}
+
+// 状态
+var board,cur,nxt,score,lines,level,speed,timer,phase;
+
+function newGame(){
+  board=[];
+  for(var i=0;i<ROWS;i++)board.push(new Array(COLS).fill(0));
+  score=0;lines=0;level=1;speed=800;timer=0;
+  cur=mkPiece();nxt=mkPiece();
+  phase='play';
+  setMsg('');upUI();
+}
+
+function upUI(){
+  document.getElementById('sc').textContent=score;
+  document.getElementById('ln').textContent=lines;
+  document.getElementById('lv').textContent=level;
+}
+function setMsg(t){document.getElementById('msg').textContent=t}
+
+function fits(s,px,py){
+  for(var r=0;r<s.length;r++)
+    for(var c=0;c<s[r].length;c++)
+      if(s[r][c]){
+        var x=px+c,y=py+r;
+        if(x<0||x>=COLS||y>=ROWS)return false;
+        if(y>=0&&board[y][x])return false;
+      }
+  return true;
+}
+
+function lock(){
+  for(var r=0;r<cur.s.length;r++)
+    for(var c=0;c<cur.s[r].length;c++)
+      if(cur.s[r][c]&&cur.y+r>=0)
+        board[cur.y+r][cur.x+c]=cur.c;
+  sfxLand();
+  var cleared=0;
+  for(var r=ROWS-1;r>=0;r--){
+    if(board[r].every(function(v){return v!==0})){
+      board.splice(r,1);
+      board.unshift(new Array(COLS).fill(0));
+      cleared++;r++;
+    }
+  }
+  if(cleared){
+    score+=[0,100,300,500,800][cleared]*level;
+    lines+=cleared;
+    level=Math.floor(lines/10)+1;
+    speed=Math.max(80,800-(level-1)*70);
+    sfxClear(cleared);upUI();
+  }
+  cur=nxt;nxt=mkPiece();timer=0;
+  if(!fits(cur.s,cur.x,cur.y)){
+    phase='over';sfxDie();
+    setMsg('GAME OVER\nEnter 重开');
+  }
+}
+
+function ghostY(){
+  var y=cur.y;
+  while(fits(cur.s,cur.x,y+1))y++;
+  return y;
+}
+
+function drawBlock(ctx,color,cx,cy,sz,alpha){
+  ctx.globalAlpha=alpha!==undefined?alpha:1;
+  ctx.fillStyle=color;
+  ctx.fillRect(cx*sz+1,cy*sz+1,sz-2,sz-2);
+  ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.fillRect(cx*sz+1,cy*sz+1,sz-2,4);
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.fillRect(cx*sz+1,cy*sz+sz-4,sz-2,3);
+  ctx.globalAlpha=1;
+}
+
+function render(){
+  // 背景
+  X.fillStyle='#000';
+  X.fillRect(0,0,C.width,C.height);
+  // 网格
+  X.strokeStyle='#1a1a1a';X.lineWidth=0.5;
+  for(var r=0;r<=ROWS;r++){X.beginPath();X.moveTo(0,r*SZ);X.lineTo(C.width,r*SZ);X.stroke()}
+  for(var c=0;c<=COLS;c++){X.beginPath();X.moveTo(c*SZ,0);X.lineTo(c*SZ,C.height);X.stroke()}
+  // 已落
+  for(var r=0;r<ROWS;r++)
+    for(var c=0;c<COLS;c++)
+      if(board[r][c])drawBlock(X,board[r][c],c,r,SZ);
+  // 幽灵+当前
+  if(phase==='play'||phase==='pause'){
+    var gy=ghostY();
+    for(var r=0;r<cur.s.length;r++)
+      for(var c=0;c<cur.s[r].length;c++)
+        if(cur.s[r][c]){
+          drawBlock(X,cur.c,cur.x+c,gy+r,SZ,0.15);
+          drawBlock(X,cur.c,cur.x+c,cur.y+r,SZ,1);
+        }
+  }
+  // 暂停
+  if(phase==='pause'){
+    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#fff';X.font='bold 18px monospace';X.textAlign='center';
+    X.fillText('PAUSED',C.width/2,C.height/2);X.textAlign='left';
+  }
+  // next
+  NX.fillStyle='#000';NX.fillRect(0,0,80,80);
+  var ns=16,ox=Math.floor((4-nxt.s[0].length)/2),oy=Math.floor((4-nxt.s.length)/2);
+  for(var r=0;r<nxt.s.length;r++)
+    for(var c=0;c<nxt.s[r].length;c++)
+      if(nxt.s[r][c])drawBlock(NX,nxt.c,ox+c,oy+r,ns);
+}
+
+// 主循环
+var last=0;
+function loop(ts){
+  var dt=Math.min(ts-last,50);last=ts;
+  if(phase==='play'){
+    timer+=dt;
+    if(timer>=speed){timer=0;if(fits(cur.s,cur.x,cur.y+1))cur.y++;else lock();}
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+// 输入
+document.addEventListener('keydown',function(e){
+  if(AC.state==='suspended')AC.resume();
+  if(e.code==='Enter'){
+    if(phase==='idle'||phase==='over')newGame();
+    else if(phase==='play'){phase='pause';setMsg('已暂停');}
+    else if(phase==='pause'){phase='play';setMsg('');}
+    e.preventDefault();return;
+  }
+  if(phase!=='play')return;
+  if(e.code==='ArrowLeft'){if(fits(cur.s,cur.x-1,cur.y)){cur.x--;sfxMove();}}
+  else if(e.code==='ArrowRight'){if(fits(cur.s,cur.x+1,cur.y)){cur.x++;sfxMove();}}
+  else if(e.code==='ArrowDown'){if(fits(cur.s,cur.x,cur.y+1)){cur.y++;timer=0;score++;upUI();}}
+  else if(e.code==='ArrowUp'){
+    var rot=rotateCW(cur.s);
+    for(var k of[0,-1,1,-2,2])if(fits(rot,cur.x+k,cur.y)){cur.s=rot;cur.x+=k;sfxRot();break;}
+  }
+  else if(e.code==='Space'){
+    var d=0;while(fits(cur.s,cur.x,cur.y+1)){cur.y++;d++;}
+    score+=d*2;upUI();sfxDrop();lock();
+  }
+  e.preventDefault();
+});
+
+phase='idle';
+// 初始化board用于渲染
+board=[];for(var i=0;i<ROWS;i++)board.push(new Array(COLS).fill(0));
+cur=mkPiece();nxt=mkPiece();
+requestAnimationFrame(function(ts){last=ts;loop(ts);});
+</script>
+</body>
+</html>
