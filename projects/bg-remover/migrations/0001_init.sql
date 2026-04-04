@@ -1,4 +1,4 @@
--- Auth.js v5 required tables for D1 adapter
+-- Auth.js v5 required tables + app tables
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT NOT NULL PRIMARY KEY,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER,
   image TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
-  remove_count INTEGER DEFAULT 0,
+  credits INTEGER DEFAULT 3,
   plan TEXT DEFAULT 'free'
 );
 
@@ -40,3 +40,13 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
   expires INTEGER NOT NULL,
   UNIQUE (identifier, token)
 );
+
+CREATE TABLE IF NOT EXISTS usage_logs (
+  id TEXT NOT NULL PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'success',
+  ip TEXT,
+  created_at INTEGER DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_logs_user_id ON usage_logs(user_id);

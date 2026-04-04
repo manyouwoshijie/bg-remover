@@ -1,9 +1,21 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function AuthButton() {
   const { data: session, status } = useSession();
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (session?.user) {
+      fetch("/api/user/stats")
+        .then((r) => r.json() as Promise<{ credits: number }>)
+        .then((d) => setCredits(d.credits ?? 0))
+        .catch(() => {});
+    }
+  }, [session]);
 
   if (status === "loading") {
     return <div className="w-24 h-9 bg-gray-200 rounded animate-pulse" />;
@@ -12,15 +24,21 @@ export default function AuthButton() {
   if (session?.user) {
     return (
       <div className="flex items-center gap-3">
-        {session.user.image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={session.user.image}
-            alt="avatar"
-            className="w-8 h-8 rounded-full"
-          />
-        )}
-        <span className="text-sm font-medium text-gray-700">{session.user.name}</span>
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 hover:opacity-80 transition"
+        >
+          {session.user.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={session.user.image} alt="avatar" className="w-8 h-8 rounded-full" />
+          )}
+          <div className="text-left">
+            <p className="text-sm font-medium text-gray-700 leading-tight">{session.user.name}</p>
+            {credits !== null && (
+              <p className="text-xs text-gray-400 leading-tight">{credits} 次额度</p>
+            )}
+          </div>
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="text-sm text-red-500 hover:underline"
@@ -34,7 +52,7 @@ export default function AuthButton() {
   return (
     <button
       onClick={() => signIn("google", { callbackUrl: "/" })}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium text-sm"
+      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
     >
       <svg className="w-4 h-4" viewBox="0 0 24 24">
         <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
