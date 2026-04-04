@@ -8,15 +8,18 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "pages:deploy": "npm run pages:build && wrangler pages deploy .vercel/output/static --project-name bg-remover"
+    "pages:deploy": "npm run pages:build && wrangler pages deploy .vercel/output/static --project-name bg-remover",
+    "db:migrate": "wrangler d1 execute bg-remover-db --file=./migrations/0001_init.sql"
   },
   "dependencies": {
+    "@auth/d1-adapter": "^1.7.4",
+    "@cloudflare/next-on-pages": "^1.11.3",
     "next": "15.2.0",
+    "next-auth": "^5.0.0-beta.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.11.3",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
