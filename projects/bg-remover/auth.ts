@@ -1,10 +1,25 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { D1Adapter } from "@auth/d1-adapter";
-import { getRequestContext } from "@cloudflare/next-on-pages";
 
-export const { handlers, signIn, signOut, auth } = NextAuth(() => {
-  const { env } = getRequestContext();
+// Auth.js v5 config factory — receives Cloudflare env via getRequestContext at runtime
+export const { handlers, signIn, signOut, auth } = NextAuth((req) => {
+  // next-on-pages injects cf bindings onto the request object
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cfEnv = (req as any)?.cf?.env as CloudflareEnv | undefined;
+
+  // Fallback: try getRequestContext (works in some next-on-pages versions)
+  let db: D1Database | undefined = cfEnv?.DB;
+
+  if (!db) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getRequestContext } = require("@cloudflare/next-on-pages");
+      db = getRequestContext().env.DB;
+    } catch {
+      // not in CF runtime (e.g. local dev)
+    }
+  }
 
   return {
     providers: [
@@ -13,11 +28,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth(() => {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       }),
     ],
-    adapter: D1Adapter(env.DB),
-    session: { strategy: "database" },
+    ...(db ? { adapter: D1Adapter(db) } : {}),
+    session: { strategy: db ? "database" : "jwt" },
     callbacks: {
-      session({ session, user }) {
-        session.user.id = user.id;
+      session({ session, user, token }) {
+        if (user) session.user.id = user.id;
+        if (token?.sub) session.user.id = token.sub;
         return session;
       },
     },

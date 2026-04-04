@@ -60,7 +60,7 @@ export default function Home() {
         let errMsg = '处理失败，请稍后重试';
         try {
           const errData = await response.json();
-          errMsg = errData.error || errMsg;
+          errMsg = (errData as { error?: string }).error || errMsg;
         } catch (e) { }
         throw new Error(errMsg);
       }
