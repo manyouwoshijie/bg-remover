@@ -13,42 +13,45 @@ function getDB(): D1Database | undefined {
   }
 }
 
-const db = getDB();
+export const { handlers, signIn, signOut, auth } = NextAuth((req) => {
+  const db = getDB();
+  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  ...(db ? { adapter: D1Adapter(db) } : {}),
-  session: { strategy: db ? "database" : "jwt" },
-  callbacks: {
-    session({ session, user, token }) {
-      if (user?.id) session.user.id = user.id;
-      else if (token?.sub) session.user.id = token.sub;
-      return session;
+  return {
+    secret,
+    providers: [
+      Google({
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      }),
+    ],
+    ...(db ? { adapter: D1Adapter(db) } : {}),
+    session: { strategy: db ? "database" : "jwt" },
+    callbacks: {
+      session({ session, user, token }) {
+        if (user?.id) session.user.id = user.id;
+        else if (token?.sub) session.user.id = token.sub;
+        return session;
+      },
     },
-  },
-  events: {
-    async createUser({ user }) {
-      if (!user.id) return;
-      const db = getDB();
-      if (!db) return;
-      try {
-        await db
-          .prepare(
-            "UPDATE users SET credits = 3, plan = 'free' WHERE id = ? AND (credits IS NULL OR credits = 0)"
-          )
-          .bind(user.id)
-          .run();
-      } catch (e) {
-        console.error("[createUser] Failed to grant credits:", e);
-      }
+    events: {
+      async createUser({ user }) {
+        if (!user.id) return;
+        const db = getDB();
+        if (!db) return;
+        try {
+          await db
+            .prepare(
+              "UPDATE users SET credits = 3, plan = 'free' WHERE id = ? AND (credits IS NULL OR credits = 0)"
+            )
+            .bind(user.id)
+            .run();
+        } catch (e) {
+          console.error("[createUser] Failed to grant credits:", e);
+        }
+      },
     },
-  },
-  pages: { signIn: "/" },
-  trustHost: true,
+    pages: { signIn: "/" },
+    trustHost: true,
+  };
 });
