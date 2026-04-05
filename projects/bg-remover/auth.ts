@@ -17,6 +17,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth(() => {
   const db = getDB();
 
   return {
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
     providers: [
       Google({
         clientId: process.env.GOOGLE_CLIENT_ID!,
